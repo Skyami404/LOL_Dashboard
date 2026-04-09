@@ -1,127 +1,146 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { useWikiSearch, WikiSearchResult } from '../lib/useWikiSearch'
+import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
+import { useWikiSearch } from '../lib/useWikiSearch'
 import WikiPreview from './WikiPreview'
 
-const TYPES = ['Players', 'Teams', 'Matches', 'Tournaments'] as const
-
+const TYPES = ['Players', 'Teams', 'Regions'] as const
 type SearchType = (typeof TYPES)[number]
+
+const REGIONS = [
+  { label: 'LCK', slug: 'LCK' },
+  { label: 'LPL', slug: 'LPL' },
+  { label: 'LEC', slug: 'LEC' },
+  { label: 'LCS', slug: 'LCS' },
+  { label: 'PCS', slug: 'PCS' },
+  { label: 'CBLOL', slug: 'CBLOL' },
+  { label: 'LLA', slug: 'LLA' },
+  { label: 'LCO', slug: 'LCO' },
+  { label: 'LJL', slug: 'LJL' },
+  { label: 'VCS', slug: 'VCS' },
+]
+
+function inferHref(title: string, type: SearchType) {
+  if (type === 'Players') return `/players/${encodeURIComponent(title)}`
+  if (type === 'Teams') return `/teams/${encodeURIComponent(title)}`
+  if (type === 'Regions') return `/league/${encodeURIComponent(title)}`
+  return null
+}
+
+function filterResults(results: { title: string }[]) {
+  // Drop sub-pages (e.g. Faker/Statistics)
+  return results.filter((r) => !r.title.includes('/'))
+}
 
 export default function SearchPanel() {
   const [query, setQuery] = useState('')
   const [type, setType] = useState<SearchType>('Players')
   const [selected, setSelected] = useState<string | null>(null)
-  const { results, isLoading, error } = useWikiSearch(query)
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  const filtered = useMemo(() => {
-    if (!query.trim()) return []
-    if (type === 'Players') return results.filter((r) => r.title.toLowerCase().includes('player') || /\b\w+\s\w+\b/.test(r.title))
-    if (type === 'Teams')
-      return results.filter((r) =>
-        r.title.toLowerCase().includes('team') || r.title.toLowerCase().includes('t1') || r.title.toLowerCase().includes('fnatic')
-      )
-    if (type === 'Matches')
-      return results.filter((r) => r.title.toLowerCase().includes('season') || r.title.toLowerCase().includes('match'))
-    if (type === 'Tournaments')
-      return results.filter((r) => r.title.toLowerCase().includes('championship') || r.title.toLowerCase().includes('world'))
-    return results
-  }, [results, type, query])
+  const { results, isLoading } = useWikiSearch(query)
+  const filtered = filterResults(results).slice(0, 8)
+
+  useEffect(() => {
+    setQuery('')
+    inputRef.current?.focus()
+  }, [type])
 
   return (
     <>
-      <div className="rounded-xl bg-slate-900/60 p-6 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search players, teams, matches..."
-            className="w-full rounded border border-slate-700 bg-slate-950/40 px-4 py-2 text-sm text-white placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 md:w-2/3"
-          />
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value as SearchType)}
-            className="w-full rounded border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-white focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 md:w-1/4"
-          >
-            {TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+      <div className="rounded-xl bg-gray-900/80 p-5 shadow-xl border border-gray-800">
+        {/* Type selector */}
+        <div className="mb-3 flex rounded-lg border border-gray-700 overflow-hidden w-fit">
+          {TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setType(t)}
+              className={`px-5 py-2 text-sm font-semibold transition-colors ${
+                type === t
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-800/60 text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
         </div>
 
-        <div className="mt-5">
-          {isLoading && <p className="text-sm text-slate-300">Searching...</p>}
-          {error && <p className="text-sm text-rose-300">{error}</p>}
-          {!isLoading && !error && query.trim().length > 0 && (
-            <div className="grid gap-4 md:grid-cols-2">
-              {filtered.length === 0 ? (
-                <div className="rounded-lg border border-slate-700 bg-slate-950/40 p-4 text-sm text-slate-200">
-                  No results found.
+        {/* Search input */}
+        {type !== 'Regions' && (
+          <div className="relative">
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={type === 'Players' ? 'Search by IGN...' : 'Search teams...'}
+              className="w-full rounded-lg border border-gray-700 bg-gray-950/60 px-4 py-2.5 text-sm text-white placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+              autoComplete="off"
+            />
+            {isLoading && query.trim() && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-400 border-t-transparent" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Regions grid */}
+        {type === 'Regions' && (
+          <div className="grid grid-cols-5 gap-2">
+            {REGIONS.map(({ label, slug }) => (
+              <Link
+                key={slug}
+                href={`/league/${slug}`}
+                className="flex items-center justify-center rounded-lg border border-gray-700 bg-gray-800/60 py-3 text-sm font-bold text-white transition hover:border-blue-500 hover:bg-blue-900/30"
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {/* Results */}
+        {type !== 'Regions' && query.trim() && (
+          <div className="mt-3 space-y-1">
+            {!isLoading && filtered.length === 0 && (
+              <p className="text-sm text-gray-500">No results for &ldquo;{query}&rdquo;</p>
+            )}
+            {filtered.map((result) => {
+              const href = inferHref(result.title, type)
+              return (
+                <div
+                  key={result.title}
+                  className="flex items-center gap-3 rounded-lg border border-gray-700/50 bg-gray-800/40 px-4 py-3 transition hover:border-blue-500/40 hover:bg-gray-800"
+                >
+                  <span className="flex-1 font-semibold text-white">{result.title}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelected(result.title)}
+                      className="rounded bg-gray-700 px-2.5 py-1 text-xs text-gray-300 hover:bg-gray-600 hover:text-white"
+                    >
+                      Preview
+                    </button>
+                    {href && (
+                      <Link
+                        href={href}
+                        className="rounded bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-500"
+                      >
+                        Open
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                filtered.map((result) => (
-                  <SearchResultCard
-                    key={result.title}
-                    type={type}
-                    result={result}
-                    onSelect={() => setSelected(result.title)}
-                  />
-                ))
-              )}
-            </div>
-          )}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {selected && <WikiPreview title={selected} onClose={() => setSelected(null)} />}
     </>
-  )
-}
-
-function renderSnippet(snippet: string) {
-  const clean = snippet.replace(/<span class="searchmatch">/g, '<strong>').replace(/<\/span>/g, '</strong>')
-  return <span dangerouslySetInnerHTML={{ __html: clean }} />
-}
-
-function inferHref(title: string, type: SearchType) {
-  const safe = encodeURIComponent(title)
-  if (type === 'Players') return `/players/${safe}`
-  if (type === 'Teams') return `/teams/${safe}`
-  if (type === 'Matches') return `/matches/${safe}`
-  if (type === 'Tournaments') return `/league/${safe}`
-  return null
-}
-
-function SearchResultCard({ result, type, onSelect }: { result: WikiSearchResult; type: SearchType; onSelect: () => void }) {
-  const href = inferHref(result.title, type)
-
-  return (
-    <div className="group w-full rounded-lg border border-slate-700 bg-white/10 p-4 text-sm text-slate-100 shadow-sm backdrop-blur transition hover:border-indigo-300 hover:bg-white/15">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-start justify-between gap-3">
-          {href ? (
-            <a href={href} className="text-lg font-semibold text-white group-hover:text-indigo-100">
-              {result.title}
-            </a>
-          ) : (
-            <h3 className="text-lg font-semibold text-white group-hover:text-indigo-100">{result.title}</h3>
-          )}
-          <button
-            type="button"
-            onClick={onSelect}
-            className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/20"
-          >
-            Preview
-          </button>
-        </div>
-        <p className="text-xs text-slate-200">{renderSnippet(result.snippet)}</p>
-        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Last updated {new Date(result.timestamp).toLocaleDateString()}</span>
-          {href && <span className="font-medium text-indigo-200 group-hover:text-indigo-100">Open ↗</span>}
-        </div>
-      </div>
-    </div>
   )
 }

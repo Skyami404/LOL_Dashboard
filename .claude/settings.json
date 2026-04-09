@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s --max-time 15 \"https://lol.fandom.com/api.php?action=query&prop=revisions&rvprop=content&titles=Faker/Tournament_Results&format=json&origin=*\")",
+      "Bash(python3 -c \" import sys, json d = json.load\\(sys.stdin\\) page = d['query']['pages'][list\\(d['query']['pages']\\)[0]] if 'revisions' in page: content = page['revisions'][0]['*'] print\\(content[:3000]\\) else: print\\('Missing page'\\) \")",
+      "Bash(curl -s -X POST http://localhost:3000/api/gol/matches -H 'Content-Type: application/x-www-form-urlencoded' -d start=0)",
+      "Bash(python3 -c \" import sys,json d=json.load\\(sys.stdin\\) tournaments = sorted\\(set\\(m['tournament'] for m in d\\)\\) print\\('Tournaments in page 0:'\\) for t in tournaments: print\\(' ', t\\) \")"
+    ],
+    "additionalDirectories": [
+      "/Users/skyami/Documents/GitHub/Lol_Dashboard/app/api/gol/player"
+    ]
+  }
+}
